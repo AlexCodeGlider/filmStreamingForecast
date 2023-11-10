@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+dist/
+eggs/
+*.egg-info/
+bin/
+include/
+lib/
+local/
+man/
+share/
+pip-wheel-metadata/
+htmlcov/
+.coverage
+.tox/
+.cache
+.pytest_cache/
+
+# PyCharm files
+.idea/
+
+# VSCode files
+.vscode/
+
+# macOS files
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Data folder
+data/
+
+# Virtual environment
+.venv/
+```
