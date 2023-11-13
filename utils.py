@@ -9,6 +9,54 @@ from sklearn.metrics import mean_absolute_percentage_error
 
 data_path = 'data/'
 
+def get_country_dfs(country, main_df, talent):
+    '''
+    Get the dataframe of a specific country
+    :param country: the country name
+    :param main_df: the main dataframe
+    :param talent: the talent dataframe
+    :return: the dataframes of a specific country
+    '''
+    # Get the dataframe of a specific country
+    local_df = main_df[main_df['country'] == country]
+
+    # Get the dataframe of a specific country
+    local_talent = talent.merge(local_df[['jw_entity_id', 'score']], on='jw_entity_id', how='inner')
+
+    # Create a feature called 'talent_total_score' to measure the total score of each talent
+    local_talent['talent_total_score'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.sum())
+
+    # Create a feature called 'talent_average_score' to measure the average score of each talent
+    local_talent['talent_average_score'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.mean())
+
+    # Create a feature called 'talent_max_score' to measure the maximum score of each talent
+    local_talent['talent_max_score'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.max())
+
+    # Create a feature called 'talent_min_score' to measure the minimum score of each talent
+    local_talent['talent_min_score'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.min())
+
+    # Create a feature called 'talent_median_score' to measure the median score of each talent
+    local_talent['talent_median_score'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.median())
+
+    # Create a feature called 'talent_std_score' to measure the standard deviation of each talent
+    local_talent['talent_std_score'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.std())
+
+    # Create a feature called 'talent_count' to measure the number of movies of each talent
+    local_talent['talent_count'] = local_talent.groupby('person_id')['score'].transform(lambda x: x.count())
+
+    # Create a feature called 'talent_total_role_score' to measure the total score of each talent in each role
+    local_talent['talent_total_role_score'] = local_talent.groupby(['person_id', 'role'])['score'].transform(lambda x: x.sum())
+
+    # Create a feature called 'talent_average_role_score' to measure the average score of each talent in each role
+    local_talent['talent_average_role_score'] = local_talent.groupby(['person_id', 'role'])['score'].transform(lambda x: x.mean())
+
+    # Create a feature called 'talent_total_genre_role_score' to measure the total score of each talent in each genre and each role
+    local_talent['talent_total_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.sum())
+
+    # Create a feature called 'talent_average_genre_role_score' to measure the average score of each talent in each genre and each role
+    local_talent['talent_average_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.mean())
+    return local_df, local_talent
+
 def graph(colab_matrix):
     G = nx.Graph()
 
