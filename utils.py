@@ -5,6 +5,7 @@ from sklearn.model_selection import KFold, train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import lightgbm as lgb
 from random import choice
+from itertools import combinations
 from sklearn.metrics import mean_absolute_percentage_error
 
 data_path = 'data/'
@@ -57,6 +58,18 @@ def get_country_dfs(country, main_df, talent):
     local_talent['talent_average_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.mean())
     return local_df, local_talent
 
+def get_colab_matrix(local_df, local_talent):
+    colab_matrix = pd.DataFrame([
+        [n, x, y]
+        for n, g in local_talent.groupby('jw_entity_id')['person_id']
+        for x, y in combinations(g, 2)
+    ], columns=['jw_entity_id', 'person_id_1', 'person_id_2'])
+    colab_matrix = colab_matrix.merge(local_df[['jw_entity_id', 'score']], how='left', on='jw_entity_id')
+    colab_matrix = colab_matrix.groupby(['person_id_1', 'person_id_2'])[['jw_entity_id', 'score']].agg(
+        {'jw_entity_id': lambda x: ','.join(x), 'score': ['count', 'sum', 'mean']}).rename(
+        columns={'count': 'num_colabs', 'sum': 'colab_total', 'mean': 'colab_avg'}).reset_index()
+    return colab_matrix
+
 def graph(colab_matrix):
     G = nx.Graph()
 
@@ -68,8 +81,8 @@ def graph(colab_matrix):
     deg_cent = pd.DataFrame.from_dict(nx.degree_centrality(G), orient='index', columns=['deg_cent'])
     ein_cent = pd.DataFrame.from_dict(nx.eigenvector_centrality(G, max_iter=300), orient='index', columns=['ein_cent'])
     cent_measures = deg_cent.join(ein_cent).reset_index().rename(columns={'index': 'person_id'})
-
-    return cent_measures
+    
+    return G, cent_measures
 
 def test_mean_target_encoding(train, test, target, categorical, alpha=5):
     # Calculate global mean on the train data
