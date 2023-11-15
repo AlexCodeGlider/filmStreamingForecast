@@ -80,8 +80,9 @@ def graph(colab_matrix):
 
     deg_cent = pd.DataFrame.from_dict(nx.degree_centrality(G), orient='index', columns=['deg_cent'])
     ein_cent = pd.DataFrame.from_dict(nx.eigenvector_centrality(G, max_iter=300), orient='index', columns=['ein_cent'])
-    cent_measures = deg_cent.join(ein_cent).reset_index().rename(columns={'index': 'person_id'})
-    
+    prank_cent = pd.DataFrame.from_dict(nx.pagerank(G, alpha=0.85), orient='index', columns=['prank_cent'])
+    cent_measures = deg_cent.join(ein_cent).join(prank_cent).reset_index().rename(columns={'index': 'person_id'})
+
     return G, cent_measures
 
 def test_mean_target_encoding(train, test, target, categorical, alpha=5):
