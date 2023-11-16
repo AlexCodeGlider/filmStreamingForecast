@@ -7,6 +7,11 @@ import lightgbm as lgb
 from random import choice
 from itertools import combinations
 from sklearn.metrics import mean_absolute_percentage_error
+from TextRank4Keyword import TextRank4Keyword # PageRank based keyword extraction
+from tqdm import tqdm
+import nltk
+nltk.download('stopwords')
+from nltk.corpus import stopwords
 
 data_path = 'data/'
 
@@ -84,6 +89,53 @@ def graph(colab_matrix):
     cent_measures = deg_cent.join(ein_cent).join(prank_cent).reset_index().rename(columns={'index': 'person_id'})
 
     return G, cent_measures
+
+def extract_keywords(plot_series):
+    tr4w = TextRank4Keyword()
+    keywords = pd.DataFrame()
+
+    print('Extracting keywords from the plot of each of {} movies...'.format(len(plot_series)))
+
+    # iterate through each movie's plot
+    for i, row in tqdm(plot_series.items()):
+        try:
+            tr4w.analyze(row, candidate_pos = ['NOUN'], window_size=4, lower=False)
+        except TypeError:
+            continue
+        local_df = pd.DataFrame(tr4w.node_weight.items())
+        local_df['jw_entity_id'] = i
+        keywords = pd.concat([keywords, local_df], ignore_index=True)
+
+    keywords.rename(columns={0:'keyword', 1:'node_weight'}, inplace=True)
+
+    # Drop stopwords from the keywords dataframe
+    keywords = keywords[~keywords['keyword'].isin(stopwords.words('english'))]
+
+    # Drop punctuation from the keywords dataframe
+    keywords = keywords[~keywords['keyword'].str.contains(r'[^\w\s]')]
+
+    # Normalize node weights by dividing by the sum of all node weights for each movie
+    keywords['node_weight_normalized'] = keywords.groupby('jw_entity_id')['node_weight'].transform(lambda x: x/x.sum())
+    
+    print('Total number of keywords extracted: {}'.format(len(keywords)))
+
+    return keywords
+
+def score_keywords(plot_series, main_df):
+    keywords = extract_keywords(plot_series)
+
+    keywords_score = keywords.merge(main_df[['country', 'jw_entity_id', 'score']], on='jw_entity_id', how='inner')
+
+    # Weigh the node weights by the movie's score
+    keywords_score['node_weight_scored'] = keywords_score['node_weight_normalized'] * keywords_score['score']
+
+    # Create a dataframe called 'keywords_scored_by_keyword_and_country' with the 'node_weight_scored' column summed by 'keyword' and 'country'
+    keywords_scored_by_keyword_and_country = keywords_score.groupby(['keyword', 'country'])['node_weight_scored'].sum().reset_index()
+
+    # Merge the 'keywords_scored' dataframe with the 'keywords_scored_by_keyword_and_country' dataframe on 'keyword' and 'country'
+    keywords_scored = keywords_score.merge(keywords_scored_by_keyword_and_country, on=['keyword', 'country'], suffixes=('', '_by_keyword_and_country'))
+
+    return keywords_scored
 
 def test_mean_target_encoding(train, test, target, categorical, alpha=5):
     # Calculate global mean on the train data
