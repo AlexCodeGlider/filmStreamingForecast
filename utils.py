@@ -57,10 +57,10 @@ def get_country_dfs(country, main_df, talent):
     local_talent['talent_average_role_score'] = local_talent.groupby(['person_id', 'role'])['score'].transform(lambda x: x.mean())
 
     # Create a feature called 'talent_total_genre_role_score' to measure the total score of each talent in each genre and each role
-    local_talent['talent_total_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.sum())
+    #local_talent['talent_total_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.sum())
 
     # Create a feature called 'talent_average_genre_role_score' to measure the average score of each talent in each genre and each role
-    local_talent['talent_average_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.mean())
+    #local_talent['talent_average_genre_role_score'] = local_talent.groupby(['person_id', 'genre_1', 'role'])['score'].transform(lambda x: x.mean())
     return local_df, local_talent
 
 def get_colab_matrix(local_df, local_talent):
@@ -179,59 +179,71 @@ def mean_target_encoding(train, test, target, categorical, alpha=5):
     # Return new features to add to the model
     return train_feature, test_feature
 
-def encode(local_df, local_pred_main, object_type):
-    cols2exclude = ['jw_entity_id',
-                    'id',
-                    'country',
-                    'original_release_year',
-                    'rank',
-                    'title',
-                    'date',
-                    'original_title',
-                    'object_type',
-                    'short_description',
-                    'tmdb_popularity',
-                    'cinema_release_date',
-                    'localized_release_date']
-    genre_cols = [col for col in local_df.columns if 'genre' in col]
-    X = local_df.drop(cols2exclude + genre_cols[3:], axis=1, errors='ignore')
-    X.index = local_df['jw_entity_id']
-    X['is_pred'] = False
-    if object_type['fp_name'] == 'movie':
-        cols2drop = ['comentarios_vivi', 'budget', 'ask', 'sales', 'plot', 'status']
-    else:
-        cols2drop = []
-    X = X.append(local_pred_main.drop(cols2drop, axis=1))
-    X['genre_2'] = X['genre_2'].fillna(X['genre_1'])
-    X['genre_3'] = X['genre_3'].fillna(X['genre_2'])
-    X['is_nflx_original'] = X['is_nflx_original'].map({True: 'Yes', False: 'No', None: 'NA'})
-    feats2encode = list(X.select_dtypes([object, bool]).columns)
-    feats2encode.remove('is_pred')
-    X_train = X[X['is_pred'] == False]
-    X_train['score'] = local_df['score'].values
-    X_test = X[X['is_pred'] == True]
-    for categorical in feats2encode:
-        X_train[categorical + '_enc'], X_test[categorical + '_enc'] = mean_target_encoding(train=X_train,
-                                                                                     test=X_test,
-                                                                                     target='score',
-                                                                                     categorical=categorical,
-                                                                                     alpha=5)
+def encode(local_df, pred_set):
+  cols2exclude = [
+      'country', 
+      'jw_entity_id', 
+      'rank', 
+      'is_nflx_original', 
+      'date',
+      'age_certification', 
+      'object_type', 
+      'original_release_year',
+      'original_title', 
+      'production_countries', 
+      'runtime',
+      'short_description', 
+      'title', 
+      'localized_release_date', 
+      'genres',
+      'comentarios_vivi', 
+      'budget', 
+      'ask', 
+      'sales', 
+      'plot', 
+      'status',
+      'market'
+      ]
+  genre_cols = [col for col in local_df.columns if 'genre' in col]
+  X_train = local_df.drop(cols2exclude + genre_cols[4:], axis=1, errors='ignore')
+  X_train.index = local_df['jw_entity_id']
+  X_pred = pred_set.drop(cols2exclude + genre_cols[4:], axis=1, errors='ignore')
+  X_pred.index = pred_set['title']
+  X_train['genre_2'] = X_train['genre_2'].fillna(X_train['genre_1'])
+  X_train['genre_3'] = X_train['genre_3'].fillna(X_train['genre_2'])
+  X_pred['genre_2'] = X_pred['genre_2'].fillna(X_pred['genre_1'])
+  X_pred['genre_3'] = X_pred['genre_3'].fillna(X_pred['genre_2'])
+  feats2encode = ['genre_1', 'genre_2', 'genre_3']
+  for categorical in feats2encode:
+      X_train[categorical + '_enc'], X_pred[categorical + '_enc'] = mean_target_encoding(train=X_train,
+                                                                                      test=X_pred,
+                                                                                      target='score',
+                                                                                      categorical=categorical,
+                                                                                      alpha=5)
 
-    X_train.drop(feats2encode, axis=1, inplace=True)
-    X_test.drop(feats2encode, axis=1, inplace=True)
+  X_train.drop(feats2encode, axis=1, inplace=True)
+  X_pred.drop(feats2encode, axis=1, inplace=True)
+  y_data = X_train['score']
+  X_train.drop('score', axis=1, inplace=True)
+  # Concatenate the 'X' and 'X_pred' dataframes
+  X = pd.concat([X_train, X_pred], axis=0)
 
-    X_full = pd.concat([X_train, X_test], axis=0, ignore_index=True)
-    y_train = local_df['score']
-    X_train.drop(['is_pred', 'score'], axis=1, inplace=True)
-    X_test.drop(['is_pred', 'score'], axis=1, inplace=True)
-    num_rows, num_cols = X_train.shape
-    columns = ['_'.join(col) if type(col) == tuple else col for col in X_train.columns]
-    X_train.columns = list(range(num_cols))
-    X_test.columns = list(range(num_cols))
+  # Fill null values with 0
+  X.fillna(0, inplace=True)
 
-    return X_full, X_train, X_test, y_train, columns
+  col_names = X.columns
+  X.columns = range(X.shape[1])
 
-def get_params(platform, X_data, y):
+  # Separate back into 'X_train' and 'X_pred'
+  X_data = X.iloc[:X_train.shape[0], :]
+  X_pred = X.iloc[X_train.shape[0]:, :]
+
+  return X_data, y_data, X_pred, col_names
+
+def get_lgbm_params(X_data, y_data):
+    """
+    Returns a dataframe of parameters for the LGBMRegressor
+    """
     param_dist_vals = {'bagging_fraction': [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
                         'colsample_bytree': [0.4, 0.5, 0.6, 0.7],
                         'learning_rate': [0.05, 0.1, 0.2, 0.3],
@@ -242,7 +254,7 @@ def get_params(platform, X_data, y):
     # @title Hyperparameter Tuning
     # prepare indexes for stratified cross validation
     kf = KFold(shuffle=True)
-    kf.get_n_splits(X_data, y)
+    kf.get_n_splits(X_data, y_data)
 
     n_iterations = 100
 
@@ -258,7 +270,7 @@ def get_params(platform, X_data, y):
     print("")
 
     for i in range(0, n_iterations):
-        kf_split = kf.split(X_data, y)
+        kf_split = kf.split(X_data, y_data)
         param_dist = {'num_leaves': choice(param_dist_vals['num_leaves']),
                         'bagging_fraction': choice(param_dist_vals['bagging_fraction']),
                         'colsample_bytree': choice(param_dist_vals['colsample_bytree']),
@@ -269,10 +281,10 @@ def get_params(platform, X_data, y):
 
         for train_index, test_index in kf_split:
             X_train = X_data.iloc[train_index]
-            y_train = y.iloc[train_index]
+            y_train = y_data.iloc[train_index]
 
             X_val = X_data.iloc[test_index]
-            y_val = y.iloc[test_index]
+            y_val = y_data.iloc[test_index]
 
             gbm = lgb.LGBMRegressor(num_leaves=param_dist['num_leaves'],
                                     bagging_fraction=param_dist['bagging_fraction'],
@@ -289,7 +301,8 @@ def get_params(platform, X_data, y):
                     eval_set=[(X_val, y_val)],
                     eval_metric='l2',
                     early_stopping_rounds=5,
-                    verbose=0)
+                    verbose=0
+            )
 
             # predicting
             y_pred = gbm.predict(X_val, num_iteration=gbm.best_iteration_)
@@ -302,20 +315,15 @@ def get_params(platform, X_data, y):
             param_list.append(param_dist)
             best_iter_list.append(gbm.best_iteration_)
 
-        lgbm_results = pd.DataFrame({"rmse": rmse_list,
-                                        "mae": mae_list,
-                                        "map": map_list,
-                                        "parameters": param_list,
-                                        "best_iteration": best_iter_list})
+    return pd.DataFrame({
+        "rmse": rmse_list,
+        "mae": mae_list,
+        "map": map_list,
+        "parameters": param_list,
+        "best_iteration": best_iter_list
+        })
 
-        best_params = lgbm_results['parameters'].iloc[lgbm_results['rmse'].idxmin()]
-        best_iter = lgbm_results['best_iteration'].iloc[lgbm_results['rmse'].idxmin()]
-        best_params_df = pd.DataFrame({0: best_params, 1: best_iter})
-        print(lgbm_results.sort_values("rmse", ascending=True, axis=0).head())
-    return best_params_df
-
-def predict(platform, X_data, X_pred, y, best_params):
-    best_params = best_params.iloc[:, 0]
+def predict(X_data, y_data, X_pred, best_params):
     gbm = lgb.LGBMRegressor(num_leaves=best_params['num_leaves'],
                             bagging_fraction=best_params['bagging_fraction'],
                             colsample_bytree=best_params['colsample_bytree'],
@@ -327,7 +335,7 @@ def predict(platform, X_data, X_pred, y, best_params):
                             n_jobs=-1
                             )
 
-    X_train, X_val, y_train, y_val = train_test_split(X_data, y)
+    X_train, X_val, y_train, y_val = train_test_split(X_data, y_data)
 
     gbm.fit(X_train, y_train,
             eval_set=[(X_val, y_val)],
