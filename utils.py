@@ -301,7 +301,7 @@ def get_lgbm_params(X_data, y_data):
                     eval_set=[(X_val, y_val)],
                     eval_metric='l2',
                     early_stopping_rounds=5,
-                    verbose=0
+                    verbose=-1
             )
 
             # predicting
