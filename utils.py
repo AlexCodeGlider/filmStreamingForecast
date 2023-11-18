@@ -64,6 +64,12 @@ def get_country_dfs(country, main_df, talent):
     return local_df, local_talent
 
 def get_colab_matrix(local_df, local_talent):
+    """
+    Get the collaboration matrix of a specific country
+    :param local_df: the dataframe of a specific country
+    :param local_talent: the talent dataframe of a specific country
+    :return: the collaboration matrix of a specific country
+    """
     colab_matrix = pd.DataFrame([
         [n, x, y]
         for n, g in local_talent.groupby('jw_entity_id')['person_id']
@@ -76,6 +82,11 @@ def get_colab_matrix(local_df, local_talent):
     return colab_matrix
 
 def graph(colab_matrix):
+    """
+    Get the graph of a specific country
+    :param colab_matrix: the collaboration matrix of a specific country
+    :return: the graph of a specific country
+    """
     G = nx.Graph()
 
     for p1, p2, n_c, c_t, c_a in zip(colab_matrix['person_id_1'], colab_matrix['person_id_2'],
@@ -91,6 +102,11 @@ def graph(colab_matrix):
     return G, cent_measures
 
 def extract_keywords(plot_series):
+    """
+    Extract keywords from the plot of each movie
+    :param plot_series: the plot series of each movie
+    :return: the keywords dataframe
+    """
     tr4w = TextRank4Keyword()
     keywords = pd.DataFrame()
 
@@ -122,6 +138,12 @@ def extract_keywords(plot_series):
     return keywords
 
 def score_keywords(plot_series, main_df):
+    """
+    Score the keywords extracted from the plot of each movie
+    :param plot_series: the plot series of each movie
+    :param main_df: the main dataframe
+    :return: the scored keywords dataframe
+    """
     keywords = extract_keywords(plot_series)
 
     keywords_score = keywords.merge(main_df[['country', 'jw_entity_id', 'score']], on='jw_entity_id', how='inner')
@@ -180,6 +202,9 @@ def mean_target_encoding(train, test, target, categorical, alpha=5):
     return train_feature, test_feature
 
 def encode(local_df, pred_set):
+  """
+    Encode the dataframes
+  """
   cols2exclude = [
       'country', 
       'jw_entity_id', 
@@ -324,6 +349,9 @@ def get_lgbm_params(X_data, y_data):
         })
 
 def predict(X_data, y_data, X_pred, best_params):
+    """
+    Predicts the score of each movie
+    """
     gbm = lgb.LGBMRegressor(num_leaves=best_params['num_leaves'],
                             bagging_fraction=best_params['bagging_fraction'],
                             colsample_bytree=best_params['colsample_bytree'],
