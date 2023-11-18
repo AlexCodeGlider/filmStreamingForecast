@@ -1,4 +1,5 @@
 # Film Streaming Forecast
+A thorough and multifaceted approach to predicting movie success, combining traditional data analysis with advanced techniques like network analysis and natural language processing.
 
 ## Overview
 This project demonstrates a predictive model using Video-On-Demand streaming data to forecast the success of movies early on. It leverages Gradient Boosting Machines and advanced feature engineering techniques.
