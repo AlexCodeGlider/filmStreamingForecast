@@ -291,6 +291,7 @@ def get_lgbm_params(X_data, y_data):
     map_list = []
     param_list = []
     best_iter_list = []
+    model_list = []
 
     # loop for random search
 
@@ -343,6 +344,7 @@ def get_lgbm_params(X_data, y_data):
             map_list.append(map)
             param_list.append(param_dist)
             best_iter_list.append(gbm.best_iteration_)
+            model_list.append(gbm)
 
     return pd.DataFrame({
         "rmse": rmse_list,
@@ -350,31 +352,4 @@ def get_lgbm_params(X_data, y_data):
         "map": map_list,
         "parameters": param_list,
         "best_iteration": best_iter_list
-        })
-
-def predict(X_data, y_data, X_pred, best_params):
-    """
-    Predicts the score of each movie
-    """
-    gbm = lgb.LGBMRegressor(num_leaves=best_params['num_leaves'],
-                            subsample=best_params['bagging_fraction'],
-                            colsample_bytree=best_params['colsample_bytree'],
-                            learning_rate=best_params['learning_rate'],
-                            boosting_type=best_params['boosting_type'],
-                            max_depth=best_params['max_depth'],
-                            reg_lambda=best_params['reg_lambda'],
-                            n_estimators=1000,
-                            n_jobs=-1
-                            )
-
-    X_train, X_val, y_train, y_val = train_test_split(X_data, y_data)
-
-    gbm.fit(X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            eval_metric='l2',
-            early_stopping_rounds=5,
-            verbose=0)
-
-    # predicting
-    y_pred = gbm.predict(X_pred, num_iteration=gbm.best_iteration_)
-    return y_pred, gbm
+        }), model_list
