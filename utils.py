@@ -5,7 +5,7 @@ from sklearn.model_selection import KFold, train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import lightgbm as lgb
 from random import choice
-from itertools import combinations
+from itertools import combinations, product
 from sklearn.metrics import mean_absolute_percentage_error
 from TextRank4Keyword import TextRank4Keyword # PageRank based keyword extraction
 from tqdm import tqdm
@@ -273,10 +273,13 @@ def get_lgbm_params(X_data, y_data):
                         'colsample_bytree': [0.4, 0.5, 0.6, 0.7],
                         'learning_rate': [0.05, 0.1, 0.2, 0.3],
                         'max_depth': [3, 4, 5, 6],
-                        'num_leaves': [20, 27, 31, 46, 61, 81],
+                        'num_leaves': [20, 27, 34, 46, 61, 81],
                         'reg_lambda': [0, 1, 2]}
 
-    # @title Hyperparameter Tuning
+    # Filter out incompatible max_depth and num_leaves combinations
+    compatible_params = [(md, nl) for md, nl in product(param_dist_vals['max_depth'], param_dist_vals['num_leaves']) if 2 ** md > nl]
+
+    # Hyperparameter Tuning
     # prepare indexes for stratified cross validation
     kf = KFold(shuffle=True)
     kf.get_n_splits(X_data, y_data)
@@ -296,12 +299,13 @@ def get_lgbm_params(X_data, y_data):
 
     for i in range(0, n_iterations):
         kf_split = kf.split(X_data, y_data)
-        param_dist = {'num_leaves': choice(param_dist_vals['num_leaves']),
+        max_depth, num_leaves = choice(compatible_params)
+        param_dist = {'num_leaves': num_leaves,
                         'bagging_fraction': choice(param_dist_vals['bagging_fraction']),
                         'colsample_bytree': choice(param_dist_vals['colsample_bytree']),
                         'learning_rate': choice(param_dist_vals['learning_rate']),
                         'boosting_type': 'gbdt',
-                        'max_depth': choice(param_dist_vals['max_depth']),
+                        'max_depth': max_depth,
                         'reg_lambda': choice(param_dist_vals['reg_lambda'])}
 
         for train_index, test_index in kf_split:
@@ -312,7 +316,7 @@ def get_lgbm_params(X_data, y_data):
             y_val = y_data.iloc[test_index]
 
             gbm = lgb.LGBMRegressor(num_leaves=param_dist['num_leaves'],
-                                    bagging_fraction=param_dist['bagging_fraction'],
+                                    subsample=param_dist['bagging_fraction'],
                                     colsample_bytree=param_dist['colsample_bytree'],
                                     learning_rate=param_dist['learning_rate'],
                                     boosting_type=param_dist['boosting_type'],
@@ -326,7 +330,7 @@ def get_lgbm_params(X_data, y_data):
                     eval_set=[(X_val, y_val)],
                     eval_metric='l2',
                     early_stopping_rounds=5,
-                    verbose=-1
+                    verbose=False
             )
 
             # predicting
@@ -353,7 +357,7 @@ def predict(X_data, y_data, X_pred, best_params):
     Predicts the score of each movie
     """
     gbm = lgb.LGBMRegressor(num_leaves=best_params['num_leaves'],
-                            bagging_fraction=best_params['bagging_fraction'],
+                            subsample=best_params['bagging_fraction'],
                             colsample_bytree=best_params['colsample_bytree'],
                             learning_rate=best_params['learning_rate'],
                             boosting_type=best_params['boosting_type'],
